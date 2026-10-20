@@ -1,5 +1,5 @@
 <template>
-    <div class="p-4 md:p-6 lg:p-8 space-y-6">
+    <div class="page-shell p-4 md:p-6 lg:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
             <div>
                 <p class="label">Antrean · Live</p>
@@ -29,6 +29,24 @@
             </div>
         </div>
 
+        <!-- Customer-specific call notification -->
+        <Transition name="bounce">
+            <div v-if="store.currentRole === 'customer' && store.queueCallForCurrentUser" class="card p-4 glow-cyan border-l-4" style="border-left-color: var(--color-accent)">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center animate-pulse shrink-0" style="background: var(--color-accent)">
+                        <SpeakerWaveIcon class="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <p class="label">Antrean kamu dipanggil</p>
+                        <p class="font-bold text-primary mt-0.5">
+                            {{ store.queueCallForCurrentUser.queueNumber }}
+                            <span class="font-normal text-sm text-muted"> · Silakan menuju {{ store.queueCallForCurrentUser.location }}</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+
         <!-- Active Call Banner -->
         <Transition name="bounce">
             <div v-if="store.activeQueue" class="card p-4 glow-cyan flex items-center gap-4">
@@ -44,7 +62,7 @@
         </Transition>
 
         <!-- Summary Pills -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div v-for="s in summary" :key="s.label" class="card p-3 text-center">
                 <p class="text-2xl font-bold tabular" :style="`color: ${s.color}`">{{ s.count }}</p>
                 <p class="text-xs text-muted mt-0.5">{{ s.label }}</p>
@@ -82,6 +100,9 @@
                             </div>
                             <p class="text-sm text-muted">🛵 {{ task.bikeModel }} · <span class="font-mono">{{ task.platNomor }}</span></p>
                             <p class="text-xs text-muted mt-0.5">📍 {{ task.location }}</p>
+                            <p v-if="task.status === 'dilewati'" class="text-xs text-slate-500 mt-1">
+                                Alasan dilewati: {{ task.skipReason || 'Tidak dicatat' }}
+                            </p>
                             <div class="flex items-center gap-3 mt-2 text-xs text-muted">
                                 <span>🕐 Jadwal: <span class="font-medium tabular">{{ task.scheduledTime }}</span></span>
                                 <span v-if="task.washerName">👷 {{ task.washerName }}</span>
@@ -129,7 +150,7 @@ const store = useAppStore();
 const activeFilter = ref('all');
 let ticker;
 
-onMounted(() => { ticker = setInterval(() => {}, 1000); });
+onMounted(() => { ticker = setInterval(store.syncQueueCall, 1000); });
 onUnmounted(() => clearInterval(ticker));
 
 const filters = computed(() => [
@@ -137,6 +158,7 @@ const filters = computed(() => [
     { key: 'menunggu', label: 'Menunggu', count: store.tasksByStatus.menunggu.length },
     { key: 'proses', label: 'Proses', count: store.tasksByStatus.proses.length },
     { key: 'selesai', label: 'Selesai', count: store.tasksByStatus.selesai.length },
+    { key: 'dilewati', label: 'Dilewati', count: store.tasksByStatus.dilewati.length },
 ]);
 
 const filteredTasks = computed(() => {
@@ -145,16 +167,17 @@ const filteredTasks = computed(() => {
 });
 
 const summary = computed(() => [
-    { label: 'Menunggu', count: store.stats.menunggu, color: '#f59e0b' },
-    { label: 'Sedang Dicuci', count: store.stats.proses, color: '#3b82f6' },
-    { label: 'Selesai', count: store.stats.selesai, color: '#10b981' },
+    { label: 'Menunggu', count: store.stats.menunggu, color: '#c26a2d' },
+    { label: 'Sedang Dicuci', count: store.stats.proses, color: '#6b7280' },
+    { label: 'Selesai', count: store.stats.selesai, color: '#3f8067' },
+    { label: 'Dilewati', count: store.tasksByStatus.dilewati.length, color: '#64748b' },
 ]);
 
 function statusBadgeClass(s) {
-    return { menunggu: 'badge-waiting', proses: 'badge-process', selesai: 'badge-done' }[s];
+    return { menunggu: 'badge-waiting', proses: 'badge-process', selesai: 'badge-done', dilewati: 'badge-skipped' }[s];
 }
 function statusLabel(s) {
-    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai' }[s] || s;
+    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai', dilewati: 'Dilewati' }[s] || s;
 }
 
 function getElapsed(task) {
@@ -168,7 +191,7 @@ function getElapsed(task) {
 function getProgress(task) {
     if (!task.startedAt) return 0;
     const elapsed = (Date.now() - new Date(task.startedAt).getTime()) / 1000;
-    const duration = task.serviceType === 'Premium' ? 1800 : task.serviceType === 'Express' ? 1200 : 900;
+    const duration = task.serviceType === 'Service Motor' ? 1200 : 900;
     return Math.min((elapsed / duration) * 100, 100);
 }
 </script>

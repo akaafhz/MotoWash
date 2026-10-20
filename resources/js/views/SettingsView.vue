@@ -1,5 +1,5 @@
 <template>
-    <div class="p-4 md:p-6 lg:p-8 max-w-2xl space-y-6">
+    <div class="page-shell p-4 md:p-6 lg:p-8 max-w-2xl space-y-6">
         <div>
             <p class="label">Pengaturan</p>
             <h1 class="text-2xl font-bold text-primary mt-1">Pengaturan Aplikasi</h1>
@@ -28,19 +28,12 @@
 
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="font-medium text-primary text-sm">Mode Tema</p>
-                    <p class="text-xs text-muted">{{ store.isDark ? 'Dark Slate & Cyan' : 'Soft Slate White & Cyan' }}</p>
+                    <p class="font-medium text-primary text-sm">Mode Terang</p>
+                    <p class="text-xs text-muted">Tampilan terang digunakan untuk seluruh aplikasi</p>
                 </div>
-                <button
-                    @click="store.toggleTheme()"
-                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                    :style="store.isDark ? 'background: var(--color-accent)' : 'background: var(--color-border)'"
-                >
-                    <span
-                        class="inline-block h-4 w-4 rounded-full bg-white shadow-lg transform transition-transform"
-                        :class="store.isDark ? 'translate-x-6' : 'translate-x-1'"
-                    />
-                </button>
+                <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                    Aktif
+                </span>
             </div>
 
             <div class="flex items-center justify-between">
@@ -57,27 +50,6 @@
                         class="inline-block h-4 w-4 rounded-full bg-white shadow-lg transform transition-transform"
                         :class="store.soundEnabled ? 'translate-x-6' : 'translate-x-1'"
                     />
-                </button>
-            </div>
-        </div>
-
-        <!-- Role -->
-        <div class="card p-5">
-            <p class="label mb-4">Mode Aktif</p>
-            <div class="grid grid-cols-3 gap-3">
-                <button
-                    v-for="role in roles"
-                    :key="role.key"
-                    @click="store.setRole(role.key)"
-                    class="p-3 rounded-xl border-2 text-center transition-all"
-                    :class="store.currentRole === role.key ? 'border-accent' : 'border-theme hover:border-muted'"
-                    :style="store.currentRole === role.key ? 'border-color: var(--color-accent); background: rgba(8,145,178,0.08)' : ''"
-                >
-                    <span class="text-2xl">{{ role.emoji }}</span>
-                    <p class="text-sm font-semibold mt-1" :style="store.currentRole === role.key ? 'color: var(--color-accent)' : ''">
-                        {{ role.label }}
-                    </p>
-                    <p class="text-xs text-muted mt-0.5">{{ role.desc }}</p>
                 </button>
             </div>
         </div>
@@ -111,7 +83,7 @@
 
         <!-- Logout -->
         <button @click="handleLogout" class="btn-danger w-full py-3">
-            🚪 Keluar dari Akun
+            Keluar dari Akun
         </button>
     </div>
 </template>
@@ -123,12 +95,6 @@ import { useAppStore } from '@/stores/app';
 
 const store = useAppStore();
 const router = useRouter();
-
-const roles = [
-    { key: 'customer', label: 'Pembeli', emoji: '🛵', desc: 'Booking motor' },
-    { key: 'washer', label: 'Pencuci', emoji: '🚿', desc: 'Kelola cuci' },
-    { key: 'admin', label: 'Admin', emoji: '📊', desc: 'Monitoring' },
-];
 
 const userInitial = computed(() => (store.user?.name || 'G').charAt(0).toUpperCase());
 

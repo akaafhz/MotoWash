@@ -57,15 +57,6 @@
                         </div>
                     </div>
 
-                    <div v-if="isRegister">
-                        <label class="block text-xs font-medium text-muted mb-1.5">Role</label>
-                        <select v-model="form.role" class="input-field">
-                            <option value="customer">Pembeli (Customer)</option>
-                            <option value="washer">Pencuci (Washer)</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-
                     <div v-if="error" class="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
                         {{ error }}
                     </div>
@@ -111,12 +102,6 @@
                 </p>
             </div>
 
-            <!-- Theme toggle -->
-            <div class="text-center mt-4">
-                <button @click="store.toggleTheme()" class="text-muted text-xs hover:text-accent transition-colors">
-                    {{ store.isDark ? '☀️ Switch to Light Mode' : '🌙 Switch to Dark Mode' }}
-                </button>
-            </div>
         </div>
     </div>
 </template>
@@ -139,7 +124,6 @@ const form = reactive({
     name: '',
     email: '',
     password: '',
-    role: 'customer',
 });
 
 const demoAccounts = [
@@ -153,7 +137,6 @@ function quickLogin(demo) {
         { name: demo.name, email: demo.email, role: demo.role },
         'demo-token-' + demo.role
     );
-    store.setRole(demo.role);
     router.push('/');
 }
 
@@ -171,7 +154,7 @@ async function handleSubmit() {
                 return;
             }
             store.setAuth(
-                { name: form.name, email: form.email, role: form.role },
+                { name: form.name, email: form.email, role: 'customer' },
                 'user-token-' + Date.now()
             );
         } else {

@@ -20,13 +20,14 @@ class Booking extends Model
         'service_type',
         'notes',
         'status',
+        'skip_reason',
         'washer_name',
         'started_at',
         'finished_at',
     ];
 
     protected $casts = [
-        'started_at'  => 'datetime',
+        'started_at' => 'datetime',
         'finished_at' => 'datetime',
     ];
 
@@ -37,10 +38,6 @@ class Booking extends Model
 
     public function getServicePriceAttribute(): int
     {
-        return match ($this->service_type) {
-            'Express' => 20000,
-            'Premium' => 25000,
-            default   => 15000,
-        };
+        return $this->service_type === 'Service Motor' ? 10000 : 15000;
     }
 }

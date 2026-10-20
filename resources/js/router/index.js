@@ -24,6 +24,7 @@ const router = createRouter({
                     path: 'antrean',
                     name: 'antrean',
                     component: () => import('@/views/QueueView.vue'),
+                    meta: { roles: ['customer', 'washer', 'admin'] },
                 },
                 {
                     path: 'tugas',
@@ -54,8 +55,13 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('motowash_token');
+    const user = JSON.parse(localStorage.getItem('motowash_user') || 'null');
+    const allowedRoles = to.meta.roles || (to.meta.role ? [to.meta.role] : null);
+
     if (to.meta.requiresAuth && !token) {
         next({ name: 'login' });
+    } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
+        next({ name: 'dashboard' });
     } else {
         next();
     }

@@ -1,27 +1,62 @@
 <template>
-    <div class="p-4 md:p-6 lg:p-8 space-y-6">
+    <div class="page-shell p-4 md:p-6 lg:p-8 space-y-6">
         <!-- Welcome Header -->
-        <div>
-            <p class="label">Dashboard</p>
-            <h1 class="text-2xl font-bold text-primary mt-1">Selamat Datang, {{ firstName }}! 👋</h1>
-            <p class="text-muted text-sm mt-1">{{ dateStr }} • Mode: <span class="font-semibold text-accent capitalize">{{ store.currentRole }}</span></p>
+        <div class="flex flex-col gap-1">
+            <p class="label">Overview</p>
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-primary">Selamat Datang, {{ firstName }}!</h1>
+            <p class="text-muted text-sm">{{ dateStr }} <span class="mx-1 text-slate-300">•</span> Mode: <span class="font-semibold text-accent capitalize">{{ store.currentRole }}</span></p>
         </div>
 
         <!-- Stats Row -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="stat-card card-hover cursor-default" v-for="stat in statCards" :key="stat.label">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="`background: ${stat.color}20`">
+        <div v-if="store.currentRole !== 'customer'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div
+                v-for="stat in statCards"
+                :key="stat.label"
+                class="stat-card card-hover min-h-36 flex flex-col justify-between"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" :style="`background: ${stat.color}12`">
                         <component :is="stat.icon" class="w-5 h-5" :style="`color: ${stat.color}`" />
                     </div>
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full" :style="`background: ${stat.color}15; color: ${stat.color}`">
+                    <span class="text-xs font-semibold px-2 py-1 rounded-full text-right" :style="`background: ${stat.color}15; color: ${stat.color}`">
                         {{ stat.change }}
                     </span>
                 </div>
-                <p class="text-2xl font-bold text-primary tabular">{{ stat.value }}</p>
-                <p class="text-xs text-muted mt-0.5">{{ stat.label }}</p>
+                <div class="mt-5">
+                    <p class="text-2xl font-bold text-primary tabular leading-none">{{ stat.value }}</p>
+                    <p class="text-xs text-muted mt-2">{{ stat.label }}</p>
+                </div>
             </div>
         </div>
+
+        <div v-if="store.currentRole === 'washer'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card p-5 border-l-4" style="border-left-color: var(--color-accent)">
+                <p class="label">Cuci Motor</p>
+                <p class="text-2xl font-bold text-primary mt-1">{{ washSummary.waiting + washSummary.active }}</p>
+                <p class="text-xs text-muted mt-1">{{ washSummary.waiting }} menunggu · {{ washSummary.active }} sedang dicuci</p>
+            </div>
+            <div class="card p-5 border-l-4" style="border-left-color: #c26a2d">
+                <p class="label">Service Motor</p>
+                <p class="text-2xl font-bold text-primary mt-1">{{ serviceSummary.waiting + serviceSummary.active }}</p>
+                <p class="text-xs text-muted mt-1">{{ serviceSummary.waiting }} menunggu · {{ serviceSummary.active }} sedang diservice</p>
+            </div>
+        </div>
+
+        <!-- Queue Call Notification (Customer) -->
+        <Transition name="bounce">
+            <div v-if="store.currentRole === 'customer' && store.queueCallForCurrentUser" class="card p-5 glow-cyan border-l-4" style="border-left-color: var(--color-accent)">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center animate-pulse shrink-0" style="background: var(--color-accent)">
+                        <SpeakerWaveIcon class="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <p class="label">Antrean kamu dipanggil</p>
+                        <p class="text-3xl font-black tabular mt-0.5 text-accent">{{ store.queueCallForCurrentUser.queueNumber }}</p>
+                        <p class="text-sm text-muted mt-1">Silakan menuju {{ store.queueCallForCurrentUser.location }}.</p>
+                    </div>
+                </div>
+            </div>
+        </Transition>
 
         <!-- My Queue Card (Customer) -->
         <div v-if="store.currentRole === 'customer' && store.myQueue" class="card p-5 glow-cyan">
@@ -51,7 +86,7 @@
         </div>
 
         <!-- Quick Actions -->
-        <div>
+        <div v-if="quickActions.length > 0">
             <p class="label mb-3">Aksi Cepat</p>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <router-link
@@ -70,7 +105,7 @@
         </div>
 
         <!-- Recent Queue -->
-        <div>
+        <div v-if="store.currentRole !== 'customer'">
             <div class="flex items-center justify-between mb-3">
                 <p class="label">Antrean Terkini</p>
                 <router-link to="/antrean" class="text-xs text-accent hover:underline">Lihat Semua →</router-link>
@@ -102,6 +137,17 @@
                                     <span :class="statusBadgeClass(task.status)">{{ statusLabel(task.status) }}</span>
                                 </td>
                             </tr>
+                            <tr v-if="recentTasks.length === 0">
+                                <td colspan="5" class="px-6 py-12">
+                                    <div class="mx-auto flex max-w-xs flex-col items-center text-center">
+                                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-dashed border-indigo-200 bg-indigo-50 text-indigo-500">
+                                            <QueueListIcon class="h-6 w-6" />
+                                        </div>
+                                        <p class="mt-3 text-sm font-semibold text-primary">Belum ada antrean</p>
+                                        <p class="mt-1 text-xs leading-5 text-muted">Antrean terbaru akan muncul di sini setelah customer melakukan booking.</p>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -111,15 +157,23 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/app';
 import {
     QueueListIcon, WrenchScrewdriverIcon, CheckCircleIcon,
     CurrencyDollarIcon, PlusCircleIcon, ChartBarIcon,
+    SpeakerWaveIcon,
 } from '@heroicons/vue/24/outline';
 import QRPlaceholder from '@/components/QRPlaceholder.vue';
 
 const store = useAppStore();
+let queueCallTicker;
+
+onMounted(() => {
+    queueCallTicker = setInterval(store.syncQueueCall, 1000);
+});
+
+onUnmounted(() => clearInterval(queueCallTicker));
 
 const firstName = computed(() => (store.user?.name || 'Tamu').split(' ')[0]);
 
@@ -132,51 +186,71 @@ const statCards = computed(() => [
         label: 'Total Antrean Hari Ini',
         value: store.stats.total,
         icon: QueueListIcon,
-        color: '#06b6d4',
-        change: '+2 hari ini',
+        color: '#4f46e5',
+        change: 'Hari ini',
     },
     {
         label: 'Sedang Menunggu',
         value: store.stats.menunggu,
         icon: QueueListIcon,
-        color: '#f59e0b',
+        color: '#6366f1',
         change: `${store.stats.menunggu} antri`,
     },
     {
         label: 'Sedang Dicuci',
         value: store.stats.proses,
         icon: WrenchScrewdriverIcon,
-        color: '#3b82f6',
+        color: '#64748b',
         change: `${store.stats.proses} aktif`,
     },
     {
         label: 'Pendapatan Hari Ini',
         value: `Rp ${(store.stats.pendapatan / 1000).toFixed(0)}K`,
         icon: CurrencyDollarIcon,
-        color: '#10b981',
+        color: '#475569',
         change: `${store.stats.selesai} selesai`,
     },
 ]);
 
-const quickActions = [
+const allQuickActions = [
     { to: '/booking', label: 'Booking Baru', desc: 'Daftar antrean cuci', icon: PlusCircleIcon },
     { to: '/antrean', label: 'Lihat Antrean', desc: 'Status antrean live', icon: QueueListIcon },
-    { to: '/tugas', label: 'Tugas Pencuci', desc: 'Board pengerjaan', icon: WrenchScrewdriverIcon },
+    { to: '/tugas', label: 'Tugas Pencuci/Service', desc: 'Board pengerjaan', icon: WrenchScrewdriverIcon },
     { to: '/admin', label: 'Panel Admin', desc: 'Monitoring operasional', icon: ChartBarIcon },
 ];
 
+const quickActions = computed(() => allQuickActions.filter(action => {
+    const allowedRoles = {
+        '/booking': ['customer'],
+        '/antrean': ['customer', 'washer', 'admin'],
+        '/tugas': ['washer'],
+        '/admin': ['admin'],
+    };
+
+    return allowedRoles[action.to].includes(store.currentRole);
+}));
+
 const recentTasks = computed(() => [...store.tasks].slice(-5).reverse());
+const washSummary = computed(() => ({
+    waiting: store.tasks.filter(task => task.serviceType === 'Cuci Motor' && task.status === 'menunggu').length,
+    active: store.tasks.filter(task => task.serviceType === 'Cuci Motor' && task.status === 'proses').length,
+}));
+const serviceSummary = computed(() => ({
+    waiting: store.tasks.filter(task => task.serviceType === 'Service Motor' && task.status === 'menunggu').length,
+    active: store.tasks.filter(task => task.serviceType === 'Service Motor' && task.status === 'proses').length,
+}));
 
 function statusBadgeClass(status) {
     return {
         menunggu: 'badge-waiting',
         proses: 'badge-process',
         selesai: 'badge-done',
+        dilewati: 'badge-skipped',
     }[status] || 'badge-waiting';
 }
 
 function statusLabel(status) {
-    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai' }[status] || status;
+    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai', dilewati: 'Dilewati' }[status] || status;
 }
 </script>
 

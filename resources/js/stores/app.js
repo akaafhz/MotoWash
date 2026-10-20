@@ -4,26 +4,26 @@ import { ref, computed } from 'vue';
 const SAMPLE_TASKS = [
     {
         id: 1,
-        queueNumber: 'A-01',
+        queueNumber: 'C-01',
         customerName: 'Budi Santoso',
         bikeModel: 'Honda Vario 125',
         platNomor: 'B 1234 XY',
         location: 'Parkir Depan Kantin',
         scheduledTime: '09:00',
-        serviceType: 'Premium',
+        serviceType: 'Cuci Motor',
         status: 'selesai',
         washerName: 'Agus',
         createdAt: new Date(Date.now() - 3600000).toISOString(),
     },
     {
         id: 2,
-        queueNumber: 'A-02',
+        queueNumber: 'C-02',
         customerName: 'Siti Rahayu',
         bikeModel: 'Yamaha NMAX',
         platNomor: 'D 5678 AB',
         location: 'Parkir Basement B2',
         scheduledTime: '10:00',
-        serviceType: 'Express',
+        serviceType: 'Cuci Motor',
         status: 'proses',
         washerName: 'Budi',
         createdAt: new Date(Date.now() - 1800000).toISOString(),
@@ -31,70 +31,133 @@ const SAMPLE_TASKS = [
     },
     {
         id: 3,
-        queueNumber: 'A-03',
+        queueNumber: 'C-03',
         customerName: 'Rizky Pratama',
         bikeModel: 'Honda PCX 160',
         platNomor: 'F 9012 CD',
         location: 'Parkir Timur Lt. 2',
         scheduledTime: '10:30',
-        serviceType: 'Premium',
+        serviceType: 'Cuci Motor',
         status: 'menunggu',
         washerName: null,
         createdAt: new Date(Date.now() - 600000).toISOString(),
     },
     {
         id: 4,
-        queueNumber: 'A-04',
+        queueNumber: 'C-04',
         customerName: 'Dewi Lestari',
         bikeModel: 'Yamaha Aerox 155',
         platNomor: 'B 3456 EF',
         location: 'Parkir Depan Kantin',
         scheduledTime: '11:00',
-        serviceType: 'Standard',
+        serviceType: 'Cuci Motor',
         status: 'menunggu',
         washerName: null,
         createdAt: new Date(Date.now() - 300000).toISOString(),
     },
     {
         id: 5,
-        queueNumber: 'A-05',
+        queueNumber: 'C-05',
         customerName: 'Andi Kurniawan',
         bikeModel: 'Kawasaki Ninja 250',
         platNomor: 'AB 7890 GH',
         location: 'Parkir Selatan',
         scheduledTime: '11:30',
-        serviceType: 'Premium',
+        serviceType: 'Cuci Motor',
         status: 'menunggu',
         washerName: null,
         createdAt: new Date().toISOString(),
+    },
+    {
+        id: 6,
+        queueNumber: 'S-01',
+        customerName: 'Fajar Nugraha',
+        bikeModel: 'Honda Beat Street',
+        platNomor: 'B 2468 KLM',
+        location: 'Parkir Basement B1',
+        scheduledTime: '11:00',
+        serviceType: 'Service Motor',
+        notes: 'Motor sulit menyala dan terdengar bunyi dari bagian CVT.',
+        status: 'menunggu',
+        washerName: null,
+        createdAt: new Date(Date.now() - 240000).toISOString(),
+    },
+    {
+        id: 7,
+        queueNumber: 'S-02',
+        customerName: 'Nadia Putri',
+        bikeModel: 'Yamaha NMAX',
+        platNomor: 'D 1357 QRS',
+        location: 'Parkir Timur Lt. 1',
+        scheduledTime: '11:30',
+        serviceType: 'Service Motor',
+        notes: 'Mohon cek rem depan dan kondisi oli mesin.',
+        status: 'menunggu',
+        washerName: null,
+        createdAt: new Date(Date.now() - 120000).toISOString(),
+    },
+    {
+        id: 8,
+        queueNumber: 'S-03',
+        customerName: 'Rangga Saputra',
+        bikeModel: 'Suzuki Satria F150',
+        platNomor: 'F 8642 TUV',
+        location: 'Parkir Selatan',
+        scheduledTime: '12:00',
+        serviceType: 'Service Motor',
+        notes: 'Rantai terasa kendur dan minta pemeriksaan gear set.',
+        status: 'proses',
+        washerName: 'Agus',
+        createdAt: new Date(Date.now() - 1500000).toISOString(),
+        startedAt: new Date(Date.now() - 600000).toISOString(),
     },
 ];
 
 export const useAppStore = defineStore('app', () => {
     // State
-    const theme = ref(localStorage.getItem('motowash_theme') || 'dark');
+    const theme = ref('light');
     const currentRole = ref(localStorage.getItem('motowash_role') || 'customer');
     const soundEnabled = ref(localStorage.getItem('motowash_sound') !== 'false');
     const sidebarOpen = ref(true);
     const tasks = ref([...SAMPLE_TASKS]);
+    const vehicles = ref(JSON.parse(localStorage.getItem('motowash_vehicles') || '[]'));
     const nextQueueNum = ref(6);
+    const nextServiceQueueNum = ref(1);
     const washTimers = ref({});
     const user = ref(JSON.parse(localStorage.getItem('motowash_user') || 'null'));
     const token = ref(localStorage.getItem('motowash_token') || null);
     const activeQueue = ref(null);
+    const queueCall = ref(readQueueCall());
 
     // Computed
-    const isDark = computed(() => theme.value === 'dark');
-
     const tasksByStatus = computed(() => ({
         menunggu: tasks.value.filter(t => t.status === 'menunggu'),
         proses: tasks.value.filter(t => t.status === 'proses'),
         selesai: tasks.value.filter(t => t.status === 'selesai'),
+        dilewati: tasks.value.filter(t => t.status === 'dilewati'),
     }));
 
     const myQueue = computed(() => {
         if (!user.value) return null;
         return tasks.value.find(t => t.customerName === user.value.name && t.status !== 'selesai') || null;
+    });
+
+    const myBookings = computed(() => {
+        if (!user.value) return [];
+        return tasks.value
+            .filter(task => task.customerName === user.value.name)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+
+    const myVehicles = computed(() => {
+        if (!user.value) return [];
+        return vehicles.value.filter(vehicle => vehicle.ownerEmail === user.value.email);
+    });
+
+    const queueCallForCurrentUser = computed(() => {
+        if (!queueCall.value || !user.value || queueCall.value.customerName !== user.value.name) return null;
+        if (Date.now() - queueCall.value.calledAt > 10000) return null;
+        return queueCall.value;
     });
 
     const stats = computed(() => ({
@@ -104,20 +167,10 @@ export const useAppStore = defineStore('app', () => {
         selesai: tasks.value.filter(t => t.status === 'selesai').length,
         pendapatan: tasks.value
             .filter(t => t.status === 'selesai')
-            .reduce((sum, t) => sum + (t.serviceType === 'Premium' ? 25000 : t.serviceType === 'Express' ? 20000 : 15000), 0),
+            .reduce((sum, task) => sum + (task.serviceType === 'Service Motor' ? 10000 : 15000), 0),
     }));
 
     // Actions
-    function toggleTheme() {
-        theme.value = theme.value === 'dark' ? 'light' : 'dark';
-        localStorage.setItem('motowash_theme', theme.value);
-        if (theme.value === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }
-
     function setRole(role) {
         currentRole.value = role;
         localStorage.setItem('motowash_role', role);
@@ -132,29 +185,53 @@ export const useAppStore = defineStore('app', () => {
         sidebarOpen.value = !sidebarOpen.value;
     }
 
+    function addVehicle(vehicleData) {
+        const vehicle = {
+            id: Date.now(),
+            ownerEmail: user.value?.email,
+            ...vehicleData,
+        };
+
+        vehicles.value.push(vehicle);
+        localStorage.setItem('motowash_vehicles', JSON.stringify(vehicles.value));
+        return vehicle;
+    }
+
+    function removeVehicle(vehicleId) {
+        vehicles.value = vehicles.value.filter(vehicle => vehicle.id !== vehicleId);
+        localStorage.setItem('motowash_vehicles', JSON.stringify(vehicles.value));
+    }
+
     function createBooking(bookingData) {
-        const num = String(nextQueueNum.value).padStart(2, '0');
+        const isService = bookingData.serviceType === 'Service Motor';
+        const num = String(isService ? nextServiceQueueNum.value : nextQueueNum.value).padStart(2, '0');
         const newTask = {
             id: Date.now(),
-            queueNumber: `A-${num}`,
+            queueNumber: `${isService ? 'S' : 'C'}-${num}`,
             customerName: user.value?.name || bookingData.customerName,
             bikeModel: bookingData.bikeModel,
             platNomor: bookingData.platNomor,
             location: bookingData.location,
             scheduledTime: bookingData.scheduledTime,
             serviceType: bookingData.serviceType,
+            notes: bookingData.notes,
             status: 'menunggu',
             washerName: null,
             createdAt: new Date().toISOString(),
         };
         tasks.value.push(newTask);
-        nextQueueNum.value++;
+        if (isService) {
+            nextServiceQueueNum.value++;
+        } else {
+            nextQueueNum.value++;
+        }
         playSound('booking');
         return newTask;
     }
 
     function startWash(taskId, washerName) {
         const task = tasks.value.find(t => t.id === taskId);
+        if (task && task.status === 'menunggu' && !canStartTask(taskId)) return;
         if (task) {
             task.status = 'proses';
             task.washerName = washerName || user.value?.name;
@@ -178,13 +255,49 @@ export const useAppStore = defineStore('app', () => {
     }
 
     function callNextQueue() {
-        const next = tasks.value.find(t => t.status === 'menunggu');
+        const next = nextWaitingTask.value;
         if (next) {
             activeQueue.value = next.queueNumber;
+            queueCall.value = {
+                queueNumber: next.queueNumber,
+                customerName: next.customerName,
+                location: next.location,
+                calledAt: Date.now(),
+            };
+            localStorage.setItem('motowash_queue_call', JSON.stringify(queueCall.value));
             playSound('call');
             setTimeout(() => { activeQueue.value = null; }, 5000);
         }
         return next;
+    }
+
+    function syncQueueCall() {
+        queueCall.value = readQueueCall();
+    }
+
+    const nextWaitingTask = computed(() => [...tasks.value]
+        .filter(task => task.status === 'menunggu')
+        .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime) || new Date(a.createdAt) - new Date(b.createdAt))[0] || null);
+
+    function skipTask(taskId, reason) {
+        const task = tasks.value.find(item => item.id === taskId);
+        if (task && task.status === 'menunggu' && reason?.trim()) {
+            task.status = 'dilewati';
+            task.skipReason = reason.trim();
+            return task;
+        }
+
+        return null;
+    }
+
+    function canStartTask(taskId) {
+        const task = tasks.value.find(item => item.id === taskId);
+
+        if (!task || task.status !== 'menunggu') return false;
+
+        return tasks.value
+            .filter(item => item.status === 'menunggu' && item.serviceType === task.serviceType)
+            .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime) || new Date(a.createdAt) - new Date(b.createdAt))[0]?.id === taskId;
     }
 
     function setAuth(userData, authToken) {
@@ -238,19 +351,30 @@ export const useAppStore = defineStore('app', () => {
     }
 
     function initTheme() {
-        if (theme.value === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
+        theme.value = 'light';
+        localStorage.setItem('motowash_theme', 'light');
+        document.documentElement.classList.remove('dark');
     }
+
+    window.addEventListener('storage', event => {
+        if (event.key === 'motowash_queue_call') syncQueueCall();
+    });
 
     return {
         theme, currentRole, soundEnabled, sidebarOpen,
-        tasks, nextQueueNum, washTimers, user, token, activeQueue,
-        isDark, tasksByStatus, myQueue, stats,
-        toggleTheme, setRole, toggleSound, toggleSidebar,
-        createBooking, startWash, finishWash, callNextQueue,
+        tasks, nextQueueNum, washTimers, vehicles, user, token, activeQueue, queueCall,
+        tasksByStatus, myQueue, myBookings, myVehicles, stats, queueCallForCurrentUser, nextWaitingTask,
+        setRole, toggleSound, toggleSidebar,
+        addVehicle, removeVehicle,
+        createBooking, startWash, finishWash, callNextQueue, syncQueueCall, skipTask, canStartTask,
         setAuth, logout, playSound, initTheme,
     };
 });
+
+function readQueueCall() {
+    const storedCall = JSON.parse(localStorage.getItem('motowash_queue_call') || 'null');
+
+    if (!storedCall || Date.now() - storedCall.calledAt > 10000) return null;
+
+    return storedCall;
+}

@@ -42,7 +42,7 @@
                 :y="size/2 - labelH/2"
                 :width="labelW"
                 :height="labelH"
-                fill="#06b6d4"
+                fill="#0f766e"
                 rx="3"
             />
             <text

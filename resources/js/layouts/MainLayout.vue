@@ -22,29 +22,10 @@
                 </Transition>
             </div>
 
-            <!-- Role Indicator -->
-            <div v-if="store.sidebarOpen" class="px-4 py-3 border-b border-theme">
-                <p class="label mb-2">Mode Aktif</p>
-                <div class="flex gap-1">
-                    <button
-                        v-for="role in roles"
-                        :key="role.key"
-                        @click="store.setRole(role.key)"
-                        class="flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-all"
-                        :class="store.currentRole === role.key
-                            ? 'text-white'
-                            : 'text-muted bg-surface-2'"
-                        :style="store.currentRole === role.key ? `background: var(--color-accent)` : ''"
-                    >
-                        {{ role.label }}
-                    </button>
-                </div>
-            </div>
-
             <!-- Navigation -->
             <nav class="flex-1 overflow-y-auto scrollbar-hide px-2 py-3 space-y-1">
                 <router-link
-                    v-for="link in navLinks"
+                    v-for="link in visibleNavLinks"
                     :key="link.to"
                     :to="link.to"
                     class="sidebar-link"
@@ -67,16 +48,8 @@
                 </router-link>
             </nav>
 
-            <!-- Bottom: Theme + User -->
+            <!-- Bottom: User -->
             <div class="border-t border-theme px-2 py-3 space-y-1 shrink-0">
-                <!-- Theme toggle -->
-                <button @click="store.toggleTheme()" class="sidebar-link w-full">
-                    <SunIcon v-if="store.isDark" class="w-5 h-5 shrink-0" />
-                    <MoonIcon v-else class="w-5 h-5 shrink-0" />
-                    <Transition name="fade">
-                        <span v-if="store.sidebarOpen">{{ store.isDark ? 'Light Mode' : 'Dark Mode' }}</span>
-                    </Transition>
-                </button>
                 <!-- User -->
                 <div v-if="store.sidebarOpen" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2">
                     <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style="background: var(--color-accent)">
@@ -133,20 +106,6 @@
 
                 <div class="flex-1" />
 
-                <!-- Role switcher pills (desktop) -->
-                <div class="hidden md:flex gap-1 p-1 rounded-lg bg-surface-2">
-                    <button
-                        v-for="role in roles"
-                        :key="role.key"
-                        @click="store.setRole(role.key)"
-                        class="px-3 py-1 rounded text-xs font-semibold transition-all"
-                        :class="store.currentRole === role.key ? 'text-white shadow-sm' : 'text-muted'"
-                        :style="store.currentRole === role.key ? 'background: var(--color-accent)' : ''"
-                    >
-                        {{ role.label }}
-                    </button>
-                </div>
-
                 <!-- Queue Alert -->
                 <Transition name="slide-down">
                     <div v-if="store.activeQueue" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold animate-pulse" style="background: rgba(34,211,238,0.15); color: var(--color-accent); border: 1px solid var(--color-accent)">
@@ -164,16 +123,6 @@
                 >
                     <SpeakerWaveIcon v-if="store.soundEnabled" class="w-5 h-5" />
                     <SpeakerXMarkIcon v-else class="w-5 h-5" />
-                </button>
-
-                <!-- Theme toggle -->
-                <button
-                    @click="store.toggleTheme()"
-                    class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-surface-2 text-muted transition-colors"
-                    title="Toggle Tema"
-                >
-                    <SunIcon v-if="store.isDark" class="w-5 h-5" />
-                    <MoonIcon v-else class="w-5 h-5" />
                 </button>
 
                 <!-- Avatar -->
@@ -221,24 +170,9 @@
                         <XMarkIcon class="w-5 h-5" />
                     </button>
                 </div>
-                <div class="px-4 py-3 border-b border-theme">
-                    <p class="label mb-2">Mode Aktif</p>
-                    <div class="flex gap-1">
-                        <button
-                            v-for="role in roles"
-                            :key="role.key"
-                            @click="store.setRole(role.key); mobileMenuOpen = false"
-                            class="flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-all"
-                            :class="store.currentRole === role.key ? 'text-white' : 'text-muted bg-surface-2'"
-                            :style="store.currentRole === role.key ? 'background: var(--color-accent)' : ''"
-                        >
-                            {{ role.label }}
-                        </button>
-                    </div>
-                </div>
                 <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-1">
                     <router-link
-                        v-for="link in navLinks"
+                        v-for="link in visibleNavLinks"
                         :key="link.to"
                         :to="link.to"
                         class="sidebar-link"
@@ -274,7 +208,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAppStore } from '@/stores/app';
 import {
     HomeIcon, QueueListIcon, WrenchScrewdriverIcon, ChartBarIcon,
-    Cog6ToothIcon, Bars3Icon, SunIcon, MoonIcon, XMarkIcon,
+    Cog6ToothIcon, Bars3Icon, XMarkIcon,
     SpeakerWaveIcon, SpeakerXMarkIcon, ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline';
 
@@ -283,31 +217,27 @@ const router = useRouter();
 const route = useRoute();
 const mobileMenuOpen = ref(false);
 
-const roles = [
-    { key: 'customer', label: 'Pembeli' },
-    { key: 'washer', label: 'Pencuci' },
-    { key: 'admin', label: 'Admin' },
-];
-
 const navLinks = computed(() => [
-    { to: '/', label: 'Dashboard', icon: HomeIcon, badge: undefined },
-    { to: '/booking', label: 'Booking Motor', icon: QueueListIcon, badge: undefined },
-    { to: '/antrean', label: 'Antrean Live', icon: QueueListIcon, badge: store.tasksByStatus.menunggu.length },
-    { to: '/tugas', label: 'Tugas Pencuci', icon: WrenchScrewdriverIcon, badge: store.tasksByStatus.proses.length },
-    { to: '/admin', label: 'Panel Admin', icon: ChartBarIcon, badge: undefined },
-    { to: '/pengaturan', label: 'Pengaturan', icon: Cog6ToothIcon, badge: undefined },
+    { to: '/', label: 'Dashboard', icon: HomeIcon, roles: ['customer', 'washer', 'admin'] },
+    { to: '/booking', label: 'Booking Motor', icon: QueueListIcon, roles: ['customer'] },
+    { to: '/antrean', label: 'Antrean Live', icon: QueueListIcon, roles: ['customer', 'washer', 'admin'], badge: store.tasksByStatus.menunggu.length },
+    { to: '/tugas', label: 'Tugas Pencuci/Service', icon: WrenchScrewdriverIcon, roles: ['washer'], badge: store.tasksByStatus.proses.length },
+    { to: '/admin', label: 'Panel Admin', icon: ChartBarIcon, roles: ['admin'] },
+    { to: '/pengaturan', label: 'Pengaturan', icon: Cog6ToothIcon, roles: ['customer', 'washer', 'admin'] },
 ]);
 
-const mobileNavLinks = [
-    { to: '/', label: 'Dashboard', short: 'Home', icon: HomeIcon },
-    { to: '/booking', label: 'Booking', short: 'Booking', icon: QueueListIcon },
-    { to: '/antrean', label: 'Antrean', short: 'Antrean', icon: QueueListIcon },
-    { to: '/tugas', label: 'Tugas', short: 'Tugas', icon: WrenchScrewdriverIcon },
-    { to: '/admin', label: 'Admin', short: 'Admin', icon: ChartBarIcon },
-];
+const visibleNavLinks = computed(() =>
+    navLinks.value.filter(link => link.roles.includes(store.user?.role))
+);
+
+const mobileNavLinks = computed(() =>
+    visibleNavLinks.value
+        .filter(link => ['/', '/booking', '/antrean', '/tugas', '/admin'].includes(link.to))
+        .map(link => ({ ...link, short: link.to === '/' ? 'Home' : link.label.split(' ')[0] }))
+);
 
 const currentPageTitle = computed(() => {
-    const link = navLinks.value.find(l => l.to === route.path);
+    const link = visibleNavLinks.value.find(l => l.to === route.path);
     return link?.label || 'Dashboard';
 });
 

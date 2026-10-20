@@ -1,5 +1,5 @@
 <template>
-    <div class="p-4 md:p-6 lg:p-8 space-y-6">
+    <div class="page-shell p-4 md:p-6 lg:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
             <div>
                 <p class="label">Admin · Monitoring</p>
@@ -40,6 +40,77 @@
                 <p class="text-xs text-muted mt-1">{{ s.sub }}</p>
             </div>
         </div>
+
+        <!-- Service and report summary -->
+        <section>
+            <div class="flex items-end justify-between gap-4 mb-3">
+                <div>
+                    <p class="label">Insight Operasional</p>
+                    <h2 class="text-lg font-bold text-primary mt-1">Ringkasan layanan & laporan hari ini</h2>
+                </div>
+                <p class="hidden sm:block text-xs text-muted">Data diperbarui secara real-time</p>
+            </div>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+                <div class="card p-5 h-full">
+                    <div class="flex items-start justify-between gap-4 mb-5">
+                        <div>
+                            <p class="label">Ringkasan Layanan</p>
+                            <p class="text-sm text-muted mt-1">Distribusi order berdasarkan layanan.</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center shrink-0">
+                            <ChartBarIcon class="w-5 h-5 text-accent" />
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div v-for="service in serviceSummary" :key="service.name">
+                            <div class="flex items-center justify-between gap-4 text-sm mb-2">
+                                <span class="font-semibold text-primary">{{ service.name }}</span>
+                                <span class="text-xs text-muted text-right">{{ service.count }} order · {{ service.revenue }}</span>
+                            </div>
+                            <div class="h-2.5 rounded-full bg-surface-2 overflow-hidden">
+                                <div class="h-full rounded-full" :style="{ width: service.percent + '%', background: service.color }" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-theme flex items-center justify-between text-xs">
+                        <span class="text-muted">Total order tercatat</span>
+                        <span class="font-bold text-primary">{{ store.tasks.length }} order</span>
+                    </div>
+                </div>
+
+                <div class="card p-5 h-full">
+                    <div class="flex items-start justify-between gap-4 mb-5">
+                        <div>
+                            <p class="label">Laporan Hari Ini</p>
+                            <p class="text-sm text-muted mt-1">Ringkasan yang siap ditinjau admin.</p>
+                        </div>
+                        <span class="badge-done shrink-0">Aktif</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="rounded-xl bg-surface-2 p-4">
+                            <p class="text-xs text-muted">Rata-rata antrean</p>
+                            <p class="text-xl font-bold text-primary mt-1">{{ averageQueueTime }} mnt</p>
+                        </div>
+                        <div class="rounded-xl bg-surface-2 p-4">
+                            <p class="text-xs text-muted">Tingkat selesai</p>
+                            <p class="text-xl font-bold text-primary mt-1">{{ completionRate }}%</p>
+                        </div>
+                        <div class="rounded-xl bg-surface-2 p-4">
+                            <p class="text-xs text-muted">Bay tersedia</p>
+                            <p class="text-xl font-bold text-primary mt-1">{{ bays.length - busyBays }}/{{ bays.length }}</p>
+                        </div>
+                        <div class="rounded-xl bg-surface-2 p-4">
+                            <p class="text-xs text-muted">Omzet selesai</p>
+                            <p class="text-xl font-bold text-primary mt-1">Rp {{ store.stats.pendapatan.toLocaleString('id-ID') }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-theme flex items-center justify-between text-xs">
+                        <span class="text-muted">Status operasional</span>
+                        <span class="font-semibold text-accent">{{ busyBays }}/{{ bays.length }} bay sedang digunakan</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- Bay Capacity -->
         <div>
@@ -121,6 +192,9 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <span :class="statusBadgeClass(task.status)">{{ statusLabel(task.status) }}</span>
+                                    <p v-if="task.status === 'dilewati'" class="text-[11px] text-muted mt-1">
+                                        Alasan: {{ task.skipReason || 'Tidak dicatat' }}
+                                    </p>
                                 </td>
                                 <td class="px-4 py-3 tabular text-sm" :class="task.status === 'selesai' ? 'text-green-500 font-semibold' : 'text-muted'">
                                     {{ task.status === 'selesai' ? servicePrice(task.serviceType) : '-' }}
@@ -128,11 +202,18 @@
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex gap-1 justify-end">
                                         <button
-                                            v-if="task.status === 'menunggu'"
+                                            v-if="task.status === 'menunggu' && store.canStartTask(task.id)"
                                             @click="store.startWash(task.id)"
                                             class="px-2 py-1 rounded text-xs btn-primary"
                                         >
                                             Mulai
+                                        </button>
+                                        <button
+                                            v-if="task.status === 'menunggu'"
+                                            @click="skipTask(task)"
+                                            class="px-2 py-1 rounded text-xs btn-secondary"
+                                        >
+                                            Skip
                                         </button>
                                         <button
                                             v-if="task.status === 'proses'"
@@ -156,7 +237,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/app';
-import { SpeakerWaveIcon } from '@heroicons/vue/24/outline';
+import { SpeakerWaveIcon, ChartBarIcon } from '@heroicons/vue/24/outline';
 
 const store = useAppStore();
 const calledQueue = ref(null);
@@ -183,6 +264,35 @@ const statCards = computed(() => [
     { label: 'Pendapatan', value: `Rp ${(store.stats.pendapatan / 1000).toFixed(0)}K`, sub: `${store.stats.selesai} order selesai` },
 ]);
 
+const serviceSummary = computed(() => {
+    const definitions = [
+        { name: 'Cuci Motor', color: '#0f766e', price: 15000 },
+        { name: 'Service Motor', color: '#c26a2d', price: 10000 },
+    ];
+    const total = store.tasks.length || 1;
+
+    return definitions.map(service => {
+        const count = store.tasks.filter(task => task.serviceType === service.name).length;
+        return {
+            ...service,
+            count,
+            percent: Math.max((count / total) * 100, count ? 8 : 0),
+            revenue: `Rp ${(store.tasks.filter(task => task.serviceType === service.name && task.status === 'selesai').length * service.price).toLocaleString('id-ID')}`,
+        };
+    });
+});
+
+const averageQueueTime = computed(() => {
+    if (!store.tasks.length) return 0;
+    const totalMinutes = store.tasks.reduce((total, task) => {
+        if (!task.startedAt) return total;
+        return total + Math.max(0, (new Date(task.startedAt) - new Date(task.createdAt)) / 60000);
+    }, 0);
+    return Math.round(totalMinutes / store.tasks.length);
+});
+
+const completionRate = computed(() => Math.round((store.stats.selesai / Math.max(store.stats.total, 1)) * 100));
+
 function callNext() {
     const next = store.callNextQueue();
     if (next) {
@@ -191,19 +301,24 @@ function callNext() {
     }
 }
 
+function skipTask(task) {
+    const reason = window.prompt(`Alasan skip antrean ${task.queueNumber}:`);
+    if (reason?.trim()) store.skipTask(task.id, reason);
+}
+
 function statusBadgeClass(s) {
-    return { menunggu: 'badge-waiting', proses: 'badge-process', selesai: 'badge-done' }[s];
+    return { menunggu: 'badge-waiting', proses: 'badge-process', selesai: 'badge-done', dilewati: 'badge-skipped' }[s];
 }
 function statusLabel(s) {
-    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai' }[s] || s;
+    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai', dilewati: 'Dilewati' }[s] || s;
 }
 function servicePrice(type) {
-    return { Standard: 'Rp 15.000', Express: 'Rp 20.000', Premium: 'Rp 25.000' }[type] || '-';
+    return type === 'Cuci Motor' ? 'Rp 15.000' : type === 'Service Motor' ? 'Rp 10.000 (cek awal)' : '-';
 }
 function getProgress(task) {
     void tick.value;
     if (!task.startedAt) return 0;
-    const dur = task.serviceType === 'Premium' ? 1800 : task.serviceType === 'Express' ? 1200 : 900;
+    const dur = task.serviceType === 'Service Motor' ? 1200 : 900;
     return Math.min(((Date.now() - new Date(task.startedAt).getTime()) / 1000 / dur) * 100, 100);
 }
 </script>

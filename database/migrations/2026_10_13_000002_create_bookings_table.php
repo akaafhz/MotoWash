@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('plat_nomor', 20);
             $table->string('scheduled_time', 10);
             $table->string('location');
-            $table->enum('service_type', ['Standard', 'Express', 'Premium'])->default('Standard');
+            $table->enum('service_type', ['Standard'])->default('Standard');
             $table->text('notes')->nullable();
             $table->enum('status', ['menunggu', 'proses', 'selesai'])->default('menunggu');
             $table->string('washer_name')->nullable();

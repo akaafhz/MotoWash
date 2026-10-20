@@ -12,7 +12,8 @@ class QueueController extends Controller
     {
         $bookings = Booking::with('user')
             ->whereDate('created_at', today())
-            ->orderBy('queue_number')
+            ->orderBy('scheduled_time')
+            ->orderBy('created_at')
             ->get();
 
         return response()->json($bookings);
@@ -22,7 +23,8 @@ class QueueController extends Controller
     {
         $next = Booking::where('status', 'menunggu')
             ->whereDate('created_at', today())
-            ->orderBy('queue_number')
+            ->orderBy('scheduled_time')
+            ->orderBy('created_at')
             ->first();
 
         if (! $next) {
@@ -35,20 +37,34 @@ class QueueController extends Controller
         ]);
     }
 
+    public function skip(Request $request, Booking $booking)
+    {
+        abort_unless($booking->status === 'menunggu', 422, 'Antrean ini tidak dapat dilewati.');
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $booking->update([
+            'status' => 'dilewati',
+            'skip_reason' => $validated['reason'],
+        ]);
+
+        return response()->json($booking);
+    }
+
     public function stats()
     {
         $today = Booking::whereDate('created_at', today());
 
-        $prices = ['Standard' => 15000, 'Express' => 20000, 'Premium' => 25000];
-
         $pendapatan = (clone $today)->where('status', 'selesai')->get()
-            ->sum(fn ($b) => $prices[$b->service_type] ?? 0);
+            ->sum(fn (Booking $booking) => $booking->service_price);
 
         return response()->json([
-            'total'      => (clone $today)->count(),
-            'menunggu'   => (clone $today)->where('status', 'menunggu')->count(),
-            'proses'     => (clone $today)->where('status', 'proses')->count(),
-            'selesai'    => (clone $today)->where('status', 'selesai')->count(),
+            'total' => (clone $today)->count(),
+            'menunggu' => (clone $today)->where('status', 'menunggu')->count(),
+            'proses' => (clone $today)->where('status', 'proses')->count(),
+            'selesai' => (clone $today)->where('status', 'selesai')->count(),
             'pendapatan' => $pendapatan,
         ]);
     }

@@ -1,10 +1,44 @@
 <template>
-    <div class="p-4 md:p-6 lg:p-8 max-w-3xl">
+    <div class="page-shell p-4 md:p-6 lg:p-8 max-w-4xl space-y-6">
         <div class="mb-6">
             <p class="label">Customer · Pemesanan</p>
             <h1 class="text-2xl font-bold text-primary mt-1">Booking Motor</h1>
             <p class="text-muted text-sm mt-1">Daftar antrean cuci motor tanpa perlu antri di tempat</p>
         </div>
+
+        <!-- Saved vehicles -->
+        <section class="card p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <p class="label">Kendaraan Saya</p>
+                    <p class="text-sm text-muted mt-1">Simpan data motor agar booking berikutnya lebih cepat.</p>
+                </div>
+                <span class="text-xs font-semibold text-accent">{{ store.myVehicles.length }} kendaraan tersimpan</span>
+            </div>
+
+            <div v-if="store.myVehicles.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div
+                    v-for="vehicle in store.myVehicles"
+                    :key="vehicle.id"
+                    class="rounded-lg border border-theme p-3 flex items-center gap-3"
+                >
+                    <div class="w-10 h-10 rounded-lg bg-surface-2 flex items-center justify-center text-lg">🛵</div>
+                    <button type="button" class="text-left flex-1 min-w-0" @click="useVehicle(vehicle)">
+                        <p class="font-semibold text-sm text-primary truncate">{{ vehicle.bikeModel }}</p>
+                        <p class="text-xs text-muted font-mono">{{ vehicle.platNomor }}</p>
+                    </button>
+                    <button type="button" class="text-xs text-red-500 hover:underline" @click="store.removeVehicle(vehicle.id)">
+                        Hapus
+                    </button>
+                </div>
+            </div>
+
+            <form class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2" @submit.prevent="saveVehicle">
+                <input v-model="vehicleForm.bikeModel" class="input-field" placeholder="Model motor" required />
+                <input v-model="vehicleForm.platNomor" class="input-field font-mono" placeholder="Nomor plat" required />
+                <button class="btn-secondary" type="submit">+ Simpan Motor</button>
+            </form>
+        </section>
 
         <!-- Success state -->
         <Transition name="slide-up">
@@ -89,6 +123,25 @@
                                 required
                             />
                         </div>
+
+                        <!-- Customer history -->
+                        <section class="card overflow-hidden">
+                            <div class="p-5 border-b border-theme">
+                                <p class="label">Riwayat Antrean</p>
+                                <p class="text-sm text-muted mt-1">Riwayat booking yang pernah dibuat dari akun ini.</p>
+                            </div>
+                            <div v-if="store.myBookings.length" class="divide-theme">
+                                <div v-for="item in store.myBookings" :key="item.id" class="flex items-center gap-3 px-5 py-3">
+                                    <span class="font-bold text-accent tabular">{{ item.queueNumber }}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-primary truncate">{{ item.bikeModel }} · {{ item.platNomor }}</p>
+                                        <p class="text-xs text-muted">{{ item.serviceType }} · {{ item.scheduledTime }}</p>
+                                    </div>
+                                    <span :class="statusBadgeClass(item.status)">{{ statusLabel(item.status) }}</span>
+                                </div>
+                            </div>
+                            <p v-else class="p-5 text-sm text-muted">Belum ada riwayat booking.</p>
+                        </section>
                         <div>
                             <label class="block text-xs font-medium text-muted mb-1.5">Nomor Plat *</label>
                             <input
@@ -111,8 +164,18 @@
                             <label class="block text-xs font-medium text-muted mb-1.5">Jam Pengambilan *</label>
                             <select v-model="form.scheduledTime" class="input-field" required>
                                 <option value="">-- Pilih Jam --</option>
-                                <option v-for="t in timeSlots" :key="t" :value="t">{{ t }}</option>
+                                <option
+                                    v-for="slot in availableTimeSlots"
+                                    :key="slot.time"
+                                    :value="slot.time"
+                                    :disabled="slot.full"
+                                >
+                                    {{ slot.time }}{{ slot.full ? ' — Penuh' : '' }}
+                                </option>
                             </select>
+                            <p class="text-xs text-muted mt-1.5">
+                                Pilih mode dan lokasi terlebih dahulu untuk melihat jam yang masih tersedia.
+                            </p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-muted mb-1.5">Lokasi Parkir *</label>
@@ -159,7 +222,10 @@
                         v-model="form.notes"
                         class="input-field resize-none"
                         rows="3"
-                        placeholder="Contoh: motor ada lecet di bagian kanan, fokus ke area ban..."
+                        :required="form.serviceType === 'Service Motor'"
+                        :placeholder="form.serviceType === 'Service Motor'
+                            ? 'Jelaskan kerusakan atau keluhan motor...'
+                            : 'Contoh: motor ada lecet di bagian kanan, fokus ke area ban...'"
                     />
                 </div>
 
@@ -193,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import QRPlaceholder from '@/components/QRPlaceholder.vue';
@@ -201,6 +267,7 @@ import QRPlaceholder from '@/components/QRPlaceholder.vue';
 const store = useAppStore();
 const booking = ref(null);
 const submitting = ref(false);
+const vehicleForm = reactive({ bikeModel: '', platNomor: '' });
 
 const timeSlots = [
     '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
@@ -219,24 +286,40 @@ const locations = [
 ];
 
 const services = [
-    { key: 'Standard', name: 'Standard', emoji: '🚿', desc: 'Cuci biasa + semprot', price: 'Rp 15.000' },
-    { key: 'Express', name: 'Express', emoji: '⚡', desc: 'Cuci cepat 20 menit', price: 'Rp 20.000' },
-    { key: 'Premium', name: 'Premium', emoji: '✨', desc: 'Cuci detail + lap poles', price: 'Rp 25.000' },
+    { key: 'Cuci Motor', name: 'Cuci Motor', emoji: '🚿', desc: 'Cuci motor standar, 15 menit', price: 'Rp 15.000' },
+    { key: 'Service Motor', name: 'Service Motor', emoji: '🔧', desc: 'Pengecekan awal, 20 menit', price: 'Rp 10.000' },
 ];
+
+const activeBookings = computed(() => store.tasks.filter(task => task.status !== 'selesai'));
+
+const availableTimeSlots = computed(() => timeSlots.map(time => ({
+    time,
+    full: !form.location || activeBookings.value.some(task =>
+        task.location === form.location &&
+        task.scheduledTime === time &&
+        task.serviceType === form.serviceType
+    ),
+})));
 
 const defaultForm = {
     bikeModel: '',
     platNomor: '',
     scheduledTime: '',
     location: '',
-    serviceType: 'Standard',
+    serviceType: 'Cuci Motor',
     notes: '',
 };
 
 const form = reactive({ ...defaultForm });
 
+watch(() => [form.location, form.serviceType], () => {
+    if (form.scheduledTime && availableTimeSlots.value.find(slot => slot.time === form.scheduledTime)?.full) {
+        form.scheduledTime = '';
+    }
+});
+
 function servicePrice(type) {
-    return services.find(s => s.key === type)?.price || '-';
+    return services.find(s => s.key === type)?.price || 'Ditentukan setelah pengecekan';
 }
 
 function resetForm() {
@@ -244,7 +327,40 @@ function resetForm() {
     booking.value = null;
 }
 
+function useVehicle(vehicle) {
+    form.bikeModel = vehicle.bikeModel;
+    form.platNomor = vehicle.platNomor;
+}
+
+function saveVehicle() {
+    store.addVehicle({
+        bikeModel: vehicleForm.bikeModel.trim(),
+        platNomor: vehicleForm.platNomor.trim().toUpperCase(),
+    });
+    Object.assign(vehicleForm, { bikeModel: '', platNomor: '' });
+}
+
+function statusBadgeClass(status) {
+    return {
+        menunggu: 'badge-waiting',
+        proses: 'badge-process',
+        selesai: 'badge-done',
+        dilewati: 'badge-skipped',
+    }[status] || 'badge-waiting';
+}
+
+function statusLabel(status) {
+    return { menunggu: 'Menunggu', proses: 'Sedang Dicuci', selesai: 'Selesai', dilewati: 'Dilewati' }[status] || status;
+}
+
 async function handleSubmit() {
+    if (!form.location || !form.scheduledTime || availableTimeSlots.value.find(slot => slot.time === form.scheduledTime)?.full) {
+        return;
+    }
+    if (form.serviceType === 'Service Motor' && !form.notes.trim()) {
+        return;
+    }
+
     submitting.value = true;
     await new Promise(r => setTimeout(r, 600));
     booking.value = store.createBooking({ ...form });
